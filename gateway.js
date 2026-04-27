@@ -36,7 +36,7 @@ app.use(express.json({ limit: '4mb' }));
 
 // Always advertise gateway in headers (visible to crawlers + curl)
 app.use((req, res, next) => {
-  res.setHeader('X-Hive-Gateway', 'hive-mcp-gateway/1.0.3');
+  res.setHeader('X-Hive-Gateway', 'hive-mcp-gateway/1.0.4');
   res.setHeader('X-Hive-Brand', 'Hive Civilization');
   res.setHeader('X-Hive-Brand-Gold', '#C08D23');
   res.setHeader('Link', '</.well-known/mcp.json>; rel="alternate"; type="application/json", </.well-known/mcp/server-card.json>; rel="alternate"; type="application/json"');
@@ -119,7 +119,7 @@ const rootJson = {
   service: 'hive-mcp-gateway',
   brand: 'Hive Civilization',
   brandGold: '#C08D23',
-  version: '1.0.3',
+  version: '1.0.4',
   servers: {
     evaluator:    { mcp: '/evaluator/mcp',    health: '/evaluator/health',    discovery: '/evaluator/.well-known/mcp.json' },
     trade:        { mcp: '/trade/mcp',        health: '/trade/health',        discovery: '/trade/.well-known/mcp.json' },
@@ -144,28 +144,56 @@ app.get('/og.svg', (req, res) => {
   res.send(renderOgImage());
 });
 
-// SEO basics
+// SEO basics — comprehensive crawler-discovery surface
 app.get('/robots.txt', (req, res) => {
   res.type('text/plain').send([
     'User-agent: *',
     'Allow: /',
     'Sitemap: https://hive-mcp-gateway.onrender.com/sitemap.xml',
+    '',
+    '# Hive Civilization · public discovery surface · indexing welcome',
   ].join('\n'));
 });
 app.get('/sitemap.xml', (req, res) => {
   const base = 'https://hive-mcp-gateway.onrender.com';
-  const urls = ['/', '/evaluator/health', '/trade/health', '/depin/health', '/compute-grid/health', '/morph/health',
-                '/.well-known/mcp.json', '/.well-known/mcp/server-card.json'];
+  const urls = [
+    '/', '/og.svg',
+    '/evaluator/health', '/trade/health', '/depin/health', '/compute-grid/health', '/morph/health',
+    '/evaluator/.well-known/mcp.json', '/trade/.well-known/mcp.json', '/depin/.well-known/mcp.json',
+    '/compute-grid/.well-known/mcp.json', '/morph/.well-known/mcp.json',
+    '/.well-known/mcp.json', '/.well-known/mcp/server-card.json', '/.well-known/security.txt',
+  ];
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     urls.map(u => `  <url><loc>${base}${u}</loc></url>`).join('\n') + `\n</urlset>`;
   res.type('application/xml').send(body);
+});
+// RFC 9116 security.txt — published security disclosure contact
+app.get('/.well-known/security.txt', (req, res) => {
+  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+  res.type('text/plain').send([
+    'Contact: mailto:steve@thehiveryiq.com',
+    `Expires: ${expires}`,
+    'Preferred-Languages: en',
+    'Canonical: https://hive-mcp-gateway.onrender.com/.well-known/security.txt',
+    'Policy: https://www.thehiveryiq.com',
+    '',
+    '# Hive Civilization · security disclosure contact',
+  ].join('\n'));
 });
 
 app.get('/health', (req, res) => res.json({
   status: 'ok',
   service: 'hive-mcp-gateway',
-  version: '1.0.3',
+  version: '1.0.4',
   servers: ['evaluator','trade','depin','compute-grid','morph'],
+  meta: {
+    discovery: '/.well-known/mcp.json',
+    sitemap:   '/sitemap.xml',
+    robots:    '/robots.txt',
+    security:  '/.well-known/security.txt',
+    seo_image: '/og.svg',
+    brand:     '#C08D23',
+  },
 }));
 
 // Smithery scanner walks the HOST root, not the mount path. Aggregate card
@@ -177,7 +205,7 @@ const aggregateCard = () => {
     for (const t of m.TOOLS) tools.push({ ...t, name: `${prefix}__${t.name}` });
   }
   return {
-    serverInfo: { name: 'hive-mcp-gateway', version: '1.0.3' },
+    serverInfo: { name: 'hive-mcp-gateway', version: '1.0.4' },
     authentication: { required: false, schemes: [] },
     tools, resources: [], prompts: [],
   };
@@ -186,7 +214,7 @@ app.get('/.well-known/mcp/server-card.json', (req, res) => res.json(aggregateCar
 app.get('/server-card.json', (req, res) => res.json(aggregateCard()));
 app.get('/.well-known/mcp.json', (req, res) => res.json({
   name: 'hive-mcp-gateway',
-  version: '1.0.3',
+  version: '1.0.4',
   servers: {
     evaluator: '/evaluator/mcp',
     trade: '/trade/mcp',

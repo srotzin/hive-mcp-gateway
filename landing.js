@@ -17,13 +17,30 @@ const ldJson = {
   '@type': 'SoftwareApplication',
   name: 'Hive Civilization MCP Gateway',
   applicationCategory: 'DeveloperApplication',
+  applicationSubCategory: 'AI Agent / MCP Server',
   operatingSystem: 'Any (HTTP)',
   url: SITE_URL,
-  description: 'Unified Model Context Protocol gateway hosting 5 Hive Civilization MCP servers exposing 29 tools for evaluation, trade, DePIN, compute, and morph agent orchestration.',
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  softwareVersion: '1.0.4',
+  description: 'Unified Model Context Protocol gateway hosting 5 Hive Civilization MCP servers exposing 29 tools for evaluation, trade, DePIN, compute, and morph agent orchestration. Real USDC settlement on Base L2. No mock receipts.',
+  keywords: 'mcp, model-context-protocol, x402, agentic, ai-agent, llm, hive-civilization, evaluator, trade-finance, depin, compute-grid, morph, usdc, base, base-l2, smithery, glama, a2a',
+  isAccessibleForFree: false,
+  inLanguage: 'en',
+  offers: [
+    { '@type': 'Offer', name: 'Discovery (mcp.json, health, server-card)', price: '0', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Tier 1 micro reads (compute-grid solve, evaluator simple read)', price: '0.001', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Tier 2 affordance verbs', price: '0.005', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Tier 3 high-value actions (book, settle, dispute, place)', price: '0.05', priceCurrency: 'USD' },
+  ],
   publisher: {
     '@type': 'Organization',
     name: 'Hive Civilization',
+    url: SITE_URL,
+    logo: `${SITE_URL}/og.svg`,
+  },
+  author: {
+    '@type': 'Person',
+    name: 'Steve Rotzin',
+    email: 'steve@thehiveryiq.com',
     url: 'https://www.thehiveryiq.com',
   },
 };
@@ -64,8 +81,11 @@ export function renderLanding() {
 <meta name="keywords" content="MCP, Model Context Protocol, Hive Civilization, AI agents, DePIN, compute marketplace, io.net, Akash, Render, Smithery, Glama"/>
 <meta name="author" content="Steve Rotzin · Hive Civilization"/>
 <meta name="theme-color" content="${BRAND_GOLD}"/>
-<meta name="robots" content="index,follow"/>
+<meta name="robots" content="index,follow,max-image-preview:large"/>
+<meta name="googlebot" content="index,follow,max-image-preview:large"/>
 <link rel="canonical" href="${SITE_URL}/"/>
+<link rel="icon" href="${SITE_URL}/og.svg" type="image/svg+xml"/>
+<link rel="alternate" type="application/xml" title="Sitemap" href="${SITE_URL}/sitemap.xml"/>
 
 <!-- OpenGraph -->
 <meta property="og:type" content="website"/>
@@ -83,6 +103,7 @@ export function renderLanding() {
 <meta name="twitter:title" content="Hive Civilization MCP Gateway"/>
 <meta name="twitter:description" content="${totalTools} tools across 5 MCP servers. Real auction. Signed receipts. NEED + YIELD + CLEAN-MONEY."/>
 <meta name="twitter:image" content="${SITE_URL}/og.svg"/>
+<meta name="twitter:creator" content="@hivecivilization"/>
 
 <!-- MCP discovery -->
 <link rel="alternate" type="application/json" title="MCP discovery" href="/.well-known/mcp.json"/>
@@ -177,7 +198,7 @@ export function renderLanding() {
       <div class="stat"><b>${SERVERS.length}</b><span>MCP servers</span></div>
       <div class="stat"><b>${totalTools}</b><span>Tools exposed</span></div>
       <div class="stat"><b>3</b><span>Compute providers</span></div>
-      <div class="stat"><b>v1.0.3</b><span>Gateway</span></div>
+      <div class="stat"><b>v1.0.4</b><span>Gateway</span></div>
     </div>
   </header>
 
@@ -219,7 +240,7 @@ export function renderOgImage() {
   </g>
   <g transform="translate(0,560)" font-family="ui-monospace,monospace" font-size="16" fill="rgba(251,246,236,.5)">
     <text x="80">hive-mcp-gateway.onrender.com</text>
-    <text x="1120" text-anchor="end">v1.0.3 · #C08D23</text>
+    <text x="1120" text-anchor="end">v1.0.4 · #C08D23</text>
   </g>
 </svg>`;
 }

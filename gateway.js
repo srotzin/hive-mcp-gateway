@@ -79,6 +79,19 @@ function mountFeature(app, basePath, mod) {
     protocol: '2024-11-05',
     tools: TOOLS.map(t => ({ name: t.name, description: t.description })),
   }));
+
+  // Smithery server-card (skips external scan; SEP-1649)
+  // https://smithery.ai/docs/build/publish
+  const serverCard = {
+    serverInfo: { name: serverInfo.name, version: serverInfo.version },
+    authentication: { required: false, schemes: [] },
+    tools: TOOLS,
+    resources: [],
+    prompts: [],
+  };
+  app.get(`${basePath}/.well-known/mcp/server-card.json`, (req, res) => res.json(serverCard));
+  // Some scanners probe the root path with no feature prefix
+  app.get(`${basePath}/server-card.json`, (req, res) => res.json(serverCard));
 }
 
 // Mount all 5 features
@@ -105,7 +118,7 @@ app.get('/', (req, res) => res.json({
 app.get('/health', (req, res) => res.json({
   status: 'ok',
   service: 'hive-mcp-gateway',
-  version: '1.0.0',
+  version: '1.0.1',
   servers: ['evaluator','trade','depin','compute-grid','morph'],
 }));
 

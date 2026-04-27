@@ -14,35 +14,110 @@ const SERVERS = [
 
 const ldJson = {
   '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: 'Hive Civilization MCP Gateway',
-  applicationCategory: 'DeveloperApplication',
-  applicationSubCategory: 'AI Agent / MCP Server',
-  operatingSystem: 'Any (HTTP)',
-  url: SITE_URL,
-  softwareVersion: '1.0.4',
-  description: 'Unified Model Context Protocol gateway hosting 5 Hive Civilization MCP servers exposing 29 tools for evaluation, trade, DePIN, compute, and morph agent orchestration. Real USDC settlement on Base L2. No mock receipts.',
-  keywords: 'mcp, model-context-protocol, x402, agentic, ai-agent, llm, hive-civilization, evaluator, trade-finance, depin, compute-grid, morph, usdc, base, base-l2, smithery, glama, a2a',
-  isAccessibleForFree: false,
-  inLanguage: 'en',
-  offers: [
-    { '@type': 'Offer', name: 'Discovery (mcp.json, health, server-card)', price: '0', priceCurrency: 'USD' },
-    { '@type': 'Offer', name: 'Tier 1 micro reads (compute-grid solve, evaluator simple read)', price: '0.001', priceCurrency: 'USD' },
-    { '@type': 'Offer', name: 'Tier 2 affordance verbs', price: '0.005', priceCurrency: 'USD' },
-    { '@type': 'Offer', name: 'Tier 3 high-value actions (book, settle, dispute, place)', price: '0.05', priceCurrency: 'USD' },
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': 'https://hiveagentiq.com/#org',
+      name: 'Hive Civilization',
+      url: 'https://hiveagentiq.com',
+      logo: `${SITE_URL}/og.svg`,
+      description: 'The native economy and infrastructure layer for autonomous AI agents. Real rails, real settlement, real provenance.',
+      contactPoint: { '@type': 'ContactPoint', email: 'steve@thehiveryiq.com', contactType: 'technical support' },
+      sameAs: ['https://github.com/srotzin', 'https://smithery.ai/server/hivecivilization'],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${SITE_URL}/#website`,
+      url: `${SITE_URL}/`,
+      name: 'Hive Civilization MCP Gateway',
+      publisher: { '@id': 'https://hiveagentiq.com/#org' },
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: { '@type': 'EntryPoint', urlTemplate: `${SITE_URL}/?q={search_term_string}` },
+        'query-input': 'required name=search_term_string',
+      },
+    },
+    {
+      '@type': 'SoftwareApplication',
+      name: 'Hive Civilization MCP Gateway',
+      applicationCategory: 'DeveloperApplication',
+      applicationSubCategory: 'AI Agent / MCP Server',
+      operatingSystem: 'Any (HTTP)',
+      url: SITE_URL,
+      softwareVersion: '1.0.4',
+      description: 'Unified MCP gateway hosting 5 Hive Civilization servers with 29 tools for evaluation, trade, DePIN, compute, and morph orchestration. Real USDC settlement on Base L2.',
+      keywords: 'agent payments, x402 facilitator, MCP USDC, agentic settlement, agent treasury, AI agent inference USDC, DePIN marketplace, agent compliance auditor, Hive Civilization',
+      isAccessibleForFree: false,
+      inLanguage: 'en',
+      offers: [
+        { '@type': 'Offer', name: 'Discovery (mcp.json, health, server-card)', price: '0', priceCurrency: 'USD' },
+        { '@type': 'Offer', name: 'Tier 1 micro reads', price: '0.001', priceCurrency: 'USD', priceSpecification: { '@type': 'UnitPriceSpecification', price: '0.001', priceCurrency: 'USD', unitText: 'per call, settled in USDC on Base L2' } },
+        { '@type': 'Offer', name: 'Tier 2 affordance verbs', price: '0.005', priceCurrency: 'USD', priceSpecification: { '@type': 'UnitPriceSpecification', price: '0.005', priceCurrency: 'USD', unitText: 'per call, settled in USDC on Base L2' } },
+        { '@type': 'Offer', name: 'Tier 3 high-value actions (book, settle, dispute, place)', price: '0.05', priceCurrency: 'USD', priceSpecification: { '@type': 'UnitPriceSpecification', price: '0.05', priceCurrency: 'USD', unitText: 'per call, settled in USDC on Base L2' } },
+      ],
+      publisher: { '@id': 'https://hiveagentiq.com/#org' },
+      author: { '@type': 'Person', name: 'Steve Rotzin', email: 'steve@thehiveryiq.com', url: 'https://www.thehiveryiq.com' },
+    },
+    {
+      '@type': 'WebAPI',
+      '@id': `${SITE_URL}/#api`,
+      name: 'Hive MCP Gateway API',
+      description: 'Unified gateway for 5 Hive MCP servers. x402 pay-per-call in USDC on Base L2. MCP 2024-11-05 Streamable-HTTP transport.',
+      url: `${SITE_URL}/`,
+      documentation: `${SITE_URL}/.well-known/mcp.json`,
+      provider: { '@id': 'https://hiveagentiq.com/#org' },
+    },
+    {
+      '@type': 'Service',
+      name: 'Hive MCP Gateway — Agent Payment & Settlement Infrastructure',
+      serviceType: 'AI Agent API Gateway',
+      provider: { '@id': 'https://hiveagentiq.com/#org' },
+      areaServed: 'Worldwide',
+      description: 'x402 facilitator and agentic settlement layer for autonomous AI agents. Routes payments, attestations, DePIN matches, compute bookings, and identity morphs in real USDC on Base L2.',
+      offers: [
+        { '@type': 'Offer', name: 'x402 Tier 1 micro read', price: '0.001', priceCurrency: 'USD' },
+        { '@type': 'Offer', name: 'x402 Tier 2 affordance', price: '0.005', priceCurrency: 'USD' },
+        { '@type': 'Offer', name: 'x402 Tier 3 settlement action', price: '0.05', priceCurrency: 'USD' },
+      ],
+    },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Hive Civilization', item: 'https://hiveagentiq.com' },
+        { '@type': 'ListItem', position: 2, name: 'MCP Gateway', item: `${SITE_URL}/` },
+      ],
+    },
+    {
+      '@type': 'FAQPage',
+      mainEntity: [
+        {
+          '@type': 'Question',
+          name: 'What is the Hive MCP Gateway?',
+          acceptedAnswer: { '@type': 'Answer', text: 'The Hive MCP Gateway is a unified Model Context Protocol gateway hosting 5 Hive Civilization servers (evaluator, trade, depin, compute-grid, morph) with 29 tools exposed over Streamable-HTTP. All calls settle pay-per-call in USDC on Base L2 via the x402 protocol.' },
+        },
+        {
+          '@type': 'Question',
+          name: 'How does x402 agent payment work?',
+          acceptedAnswer: { '@type': 'Answer', text: 'x402 is an HTTP 402 Payment Required facilitator protocol. Agents attach a signed USDC payment intent to API calls. The gateway verifies the payment on Base L2 before routing the request. No subscription, no invoices — pay-per-call with USDC settlement in the same HTTP round trip.' },
+        },
+        {
+          '@type': 'Question',
+          name: 'Which MCP servers are hosted at this gateway?',
+          acceptedAnswer: { '@type': 'Answer', text: 'Five servers: /evaluator (ERC-8183 compliance, ACP v2.0 scoring), /trade (cross-border SMB invoice settlement, USDC/USDT), /depin (DePIN marketplace, 22 metadata fields, 0.15% match fee), /compute-grid (cross-pool compute auction, Groth16 proofs at $0.001), and /morph (polymorphic identity and brood telemetry, 14 read-only tools).' },
+        },
+        {
+          '@type': 'Question',
+          name: 'How do I connect an AI agent to the gateway?',
+          acceptedAnswer: { '@type': 'Answer', text: 'Point your MCP client at https://hive-mcp-gateway.onrender.com/evaluator/mcp (or any mount). Fetch /.well-known/mcp.json for the discovery descriptor. Send X-Agent-DID: did:hive:<your-did> for per-DID usage tracking and 100 free reads/day. Calls above the free tier require a USDC payment intent per the x402 spec.' },
+        },
+        {
+          '@type': 'Question',
+          name: 'What is the NEED + YIELD + CLEAN-MONEY gate?',
+          acceptedAnswer: { '@type': 'Answer', text: 'Every Tier 3 action (book, settle, dispute, place prediction) passes through a three-gate evaluator: NEED (is the action economically necessary?), YIELD (does it improve agent ROI?), and CLEAN-MONEY (does the payment intent pass anti-money-laundering heuristics?). The Evaluator server runs ERC-8183 scoring and issues EIP-3009 attestations.' },
+        },
+      ],
+    },
   ],
-  publisher: {
-    '@type': 'Organization',
-    name: 'Hive Civilization',
-    url: SITE_URL,
-    logo: `${SITE_URL}/og.svg`,
-  },
-  author: {
-    '@type': 'Person',
-    name: 'Steve Rotzin',
-    email: 'steve@thehiveryiq.com',
-    url: 'https://www.thehiveryiq.com',
-  },
 };
 
 export function renderLanding() {
@@ -104,6 +179,38 @@ export function renderLanding() {
 <meta name="twitter:description" content="${totalTools} tools across 5 MCP servers. Real auction. Signed receipts. NEED + YIELD + CLEAN-MONEY."/>
 <meta name="twitter:image" content="${SITE_URL}/og.svg"/>
 <meta name="twitter:creator" content="@hivecivilization"/>
+
+<!-- Twitter / X additional -->
+<meta name="twitter:site" content="@hiveagentiq"/>
+<meta name="twitter:creator" content="@hiveagentiq"/>
+
+<!-- OG additional -->
+<meta property="og:image:alt" content="Hive Civilization MCP Gateway — unified agent payment infrastructure logo"/>
+<meta property="og:locale" content="en_US"/>
+
+<!-- Apple / mobile -->
+<meta name="apple-mobile-web-app-title" content="Hive MCP Gateway"/>
+<meta name="format-detection" content="telephone=no"/>
+
+<!-- Bing -->
+<meta name="bingbot" content="index, follow"/>
+
+<!-- Verification placeholders -->
+<!-- <meta name="google-site-verification" content="..." /> -->
+<!-- <meta name="msvalidate.01" content="..." /> -->
+
+<!-- Dublin Core -->
+<meta name="DC.title" content="Hive Civilization MCP Gateway — Unified Agent Payment Infrastructure"/>
+<meta name="DC.creator" content="Hive Civilization"/>
+<meta name="DC.subject" content="agent payments, x402 facilitator, MCP USDC, agentic settlement"/>
+<meta name="DC.publisher" content="Hive Civilization"/>
+<meta name="DC.rights" content="MIT"/>
+
+<!-- Agent / x402 hints -->
+<meta name="x402-facilitator" content="https://hivemorph.onrender.com"/>
+<meta name="x402-settlement" content="USDC,USDT,Base,Solana"/>
+<meta name="agent-onboarding" content="X-Agent-DID header for 100 free reads/day per DID"/>
+<meta name="hive-network" content="https://hiveagentiq.com"/>
 
 <!-- MCP discovery -->
 <link rel="alternate" type="application/json" title="MCP discovery" href="/.well-known/mcp.json"/>

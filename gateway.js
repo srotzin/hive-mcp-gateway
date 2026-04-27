@@ -161,7 +161,11 @@ app.get('/sitemap.xml', (req, res) => {
     '/evaluator/health', '/trade/health', '/depin/health', '/compute-grid/health', '/morph/health',
     '/evaluator/.well-known/mcp.json', '/trade/.well-known/mcp.json', '/depin/.well-known/mcp.json',
     '/compute-grid/.well-known/mcp.json', '/morph/.well-known/mcp.json',
+    '/evaluator/sitemap.xml', '/trade/sitemap.xml', '/depin/sitemap.xml',
+    '/compute-grid/sitemap.xml', '/morph/sitemap.xml',
     '/.well-known/mcp.json', '/.well-known/mcp/server-card.json', '/.well-known/security.txt',
+    '/v1/discovery/featured', '/v1/earn/leaderboard',
+    '/robots.txt', '/sitemap.xml', '/humans.txt',
   ];
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     urls.map(u => `  <url><loc>${base}${u}</loc></url>`).join('\n') + `\n</urlset>`;
@@ -178,6 +182,25 @@ app.get('/.well-known/security.txt', (req, res) => {
     'Policy: https://www.thehiveryiq.com',
     '',
     '# Hive Civilization · security disclosure contact',
+  ].join('\n'));
+});
+
+// humans.txt — quality signal for crawlers
+app.get('/humans.txt', (req, res) => {
+  res.type('text/plain').send([
+    '/* TEAM */',
+    'Creator: Steve Rotzin',
+    'Contact: steve@thehiveryiq.com',
+    'Location: United States',
+    '',
+    '/* SITE */',
+    'Last update: ' + new Date().toISOString().slice(0, 10),
+    'Language: English',
+    'Standards: MCP 2024-11-05, x402, schema.org JSON-LD, RFC 9116',
+    'Software: Hive Civilization MCP Gateway v1.0.4',
+    '',
+    '/* THANKS */',
+    'Hive Civilization community · hiveagentiq.com',
   ].join('\n'));
 });
 

@@ -224,6 +224,54 @@ app.get('/.well-known/mcp.json', (req, res) => res.json({
   },
 }));
 
+// ─── Agent-network beacon ────────────────────────────────────────────────────
+// Single-fetch ecosystem discovery for CrewAI/AutoGen/LangChain/A2A crawlers.
+// RFC-style: /.well-known/ prefix so any agent pinging the root finds all Hive
+// surfaces in one round-trip without knowing individual service URLs.
+const AGENT_NETWORK = {
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  schema_version: 'agent-network/v0.1',
+  ecosystem: 'Hive Civilization',
+  homepage: 'https://hiveagentiq.com',
+  brand_color: '#C08D23',
+  settlement: {
+    protocol: 'x402',
+    chains: ['base', 'solana', 'ethereum'],
+    tokens: ['USDC', 'USDT'],
+    facilitator: 'https://hivemorph.onrender.com',
+  },
+  agent_onboarding: 'Send X-Agent-DID header for 100 free reads/day per DID',
+  surfaces: [
+    { name: 'HiveCompute', category: 'inference', url: 'https://hivecompute-g2g7.onrender.com', mcp: 'https://hivecompute-g2g7.onrender.com/mcp', agent_card: 'https://hivecompute-g2g7.onrender.com/.well-known/agent-card.json', repo: 'https://github.com/srotzin/hivecompute' },
+    { name: 'HiveEvaluator', category: 'evaluation', url: 'https://hive-mcp-gateway.onrender.com/evaluator', agent_card: 'https://hive-mcp-gateway.onrender.com/evaluator/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-evaluator' },
+    { name: 'HiveTrade', category: 'settlement', url: 'https://hive-mcp-gateway.onrender.com/trade', agent_card: 'https://hive-mcp-gateway.onrender.com/trade/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-trade' },
+    { name: 'HiveDePIN', category: 'depin', url: 'https://hive-mcp-gateway.onrender.com/depin', agent_card: 'https://hive-mcp-gateway.onrender.com/depin/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-depin' },
+    { name: 'HiveComputeGrid', category: 'compute_auction', url: 'https://hive-mcp-gateway.onrender.com/compute-grid', agent_card: 'https://hive-mcp-gateway.onrender.com/compute-grid/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-compute-grid' },
+    { name: 'HiveMining', category: 'btc_hashrate', url: 'https://hive-mcp-gateway.onrender.com/mining', agent_card: 'https://hive-mcp-gateway.onrender.com/mining/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-mining' },
+    { name: 'HiveSwap', category: 'dex', url: 'https://hive-mcp-gateway.onrender.com/swap', repo: 'https://github.com/srotzin/hive-mcp-swap' },
+    { name: 'HiveVault', category: 'vault', url: 'https://hive-mcp-gateway.onrender.com/vault', repo: 'https://github.com/srotzin/hive-mcp-vault' },
+    { name: 'HiveExchange', category: 'perps', url: 'https://hive-mcp-gateway.onrender.com/exchange', repo: 'https://github.com/srotzin/hive-mcp-exchange' },
+    { name: 'HiveMOS', category: 'mining_orchestration', url: 'https://hivemorph.onrender.com/v1/mining/orchestrate', repo: 'https://github.com/srotzin/hive-mos-plugin' },
+    { name: 'HiveMorph', category: 'polymorphic_identity', url: 'https://hive-mcp-gateway.onrender.com/morph', repo: 'https://github.com/srotzin/hive-mcp-morph' },
+  ],
+  discovery: {
+    featured: 'https://hivemorph.onrender.com/v1/discovery/featured',
+    stranded: 'https://hivemorph.onrender.com/v1/discovery/stranded',
+    leaderboard: 'https://hivemorph.onrender.com/v1/earn/leaderboard',
+  },
+  registries: {
+    smithery: 'https://smithery.ai/?q=hive-mcp',
+    glama: 'https://glama.ai/mcp/servers?q=hive',
+    mcp_so: 'https://mcp.so/?q=hive',
+    awesome_mcp_pr: 'https://github.com/punkpeye/awesome-mcp-servers/pull/5481',
+  },
+};
+app.get('/.well-known/agent-network.json', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.json(AGENT_NETWORK);
+});
+
 app.listen(PORT, () => {
   console.log(`hive-mcp-gateway running on :${PORT}`);
   for (const m of [M_evaluator, M_trade, M_depin, M_compute_grid, M_morph]) {

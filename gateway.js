@@ -34,9 +34,26 @@ import { renderLanding, renderOgImage } from './landing.js';
 
 app.use(express.json({ limit: '4mb' }));
 
+// ─── 22-shim registry ────────────────────────────────────────────────────────
+// Canonical Render hosts for every hive-mcp-* shim. The gateway is a discovery
+// surface — direct URLs are recommended for Glama/Smithery probes.
+const SHIM_SLUGS = [
+  'agent-kyc', 'agent-storage', 'capital', 'compute', 'compute-grid',
+  'connector', 'credit', 'depin', 'escrow', 'evaluator', 'exchange',
+  'gateway', 'identity', 'insurance', 'mining', 'morph', 'mos',
+  'oracle', 'swap', 'trade', 'vault', 'zk-attestation',
+];
+const shimHost = (slug) => `https://hive-mcp-${slug}.onrender.com`;
+const SHIM_REGISTRY = Object.fromEntries(SHIM_SLUGS.map((slug) => [slug, {
+  url: shimHost(slug),
+  mcp: `${shimHost(slug)}/mcp`,
+  discovery: `${shimHost(slug)}/.well-known/mcp.json`,
+  repo: `https://github.com/srotzin/hive-mcp-${slug}`,
+}]));
+
 // Always advertise gateway in headers (visible to crawlers + curl)
 app.use((req, res, next) => {
-  res.setHeader('X-Hive-Gateway', 'hive-mcp-gateway/1.0.4');
+  res.setHeader('X-Hive-Gateway', 'hive-mcp-gateway/1.1.0');
   res.setHeader('X-Hive-Brand', 'Hive Civilization');
   res.setHeader('X-Hive-Brand-Gold', '#C08D23');
   res.setHeader('Link', '</.well-known/mcp.json>; rel="alternate"; type="application/json", </.well-known/mcp/server-card.json>; rel="alternate"; type="application/json"');
@@ -119,14 +136,16 @@ const rootJson = {
   service: 'hive-mcp-gateway',
   brand: 'Hive Civilization',
   brandGold: '#C08D23',
-  version: '1.0.4',
+  version: '1.1.0',
+  description: 'Hive Civilization MCP registry — discovery surface for the 22 hive-mcp-* servers.',
   servers: {
-    evaluator:    { mcp: '/evaluator/mcp',    health: '/evaluator/health',    discovery: '/evaluator/.well-known/mcp.json' },
-    trade:        { mcp: '/trade/mcp',        health: '/trade/health',        discovery: '/trade/.well-known/mcp.json' },
-    depin:        { mcp: '/depin/mcp',        health: '/depin/health',        discovery: '/depin/.well-known/mcp.json' },
-    'compute-grid': { mcp: '/compute-grid/mcp', health: '/compute-grid/health', discovery: '/compute-grid/.well-known/mcp.json' },
-    morph:        { mcp: '/morph/mcp',        health: '/morph/health',        discovery: '/morph/.well-known/mcp.json' },
+    evaluator:      { mcp: '/evaluator/mcp',      health: '/evaluator/health',      discovery: '/evaluator/.well-known/mcp.json',      direct: shimHost('evaluator') },
+    trade:          { mcp: '/trade/mcp',          health: '/trade/health',          discovery: '/trade/.well-known/mcp.json',          direct: shimHost('trade') },
+    depin:          { mcp: '/depin/mcp',          health: '/depin/health',          discovery: '/depin/.well-known/mcp.json',          direct: shimHost('depin') },
+    'compute-grid': { mcp: '/compute-grid/mcp',   health: '/compute-grid/health',   discovery: '/compute-grid/.well-known/mcp.json',   direct: shimHost('compute-grid') },
+    morph:          { mcp: '/morph/mcp',          health: '/morph/health',          discovery: '/morph/.well-known/mcp.json',          direct: shimHost('morph') },
   },
+  registry: SHIM_REGISTRY,
 };
 app.get('/', (req, res) => {
   const accept = String(req.headers.accept || '');
@@ -156,7 +175,7 @@ app.get('/robots.txt', (req, res) => {
 });
 app.get('/sitemap.xml', (req, res) => {
   const base = 'https://hive-mcp-gateway.onrender.com';
-  const urls = [
+  const localUrls = [
     '/', '/og.svg',
     '/evaluator/health', '/trade/health', '/depin/health', '/compute-grid/health', '/morph/health',
     '/evaluator/.well-known/mcp.json', '/trade/.well-known/mcp.json', '/depin/.well-known/mcp.json',
@@ -164,11 +183,17 @@ app.get('/sitemap.xml', (req, res) => {
     '/evaluator/sitemap.xml', '/trade/sitemap.xml', '/depin/sitemap.xml',
     '/compute-grid/sitemap.xml', '/morph/sitemap.xml',
     '/.well-known/mcp.json', '/.well-known/mcp/server-card.json', '/.well-known/security.txt',
+    '/.well-known/agent-network.json',
     '/v1/discovery/featured', '/v1/earn/leaderboard',
     '/robots.txt', '/sitemap.xml', '/humans.txt',
   ];
+  const directUrls = SHIM_SLUGS.flatMap((slug) => [
+    shimHost(slug),
+    `${shimHost(slug)}/.well-known/mcp.json`,
+  ]);
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    urls.map(u => `  <url><loc>${base}${u}</loc></url>`).join('\n') + `\n</urlset>`;
+    localUrls.map(u => `  <url><loc>${base}${u}</loc></url>`).join('\n') + '\n' +
+    directUrls.map(u => `  <url><loc>${u}</loc></url>`).join('\n') + `\n</urlset>`;
   res.type('application/xml').send(body);
 });
 // RFC 9116 security.txt — published security disclosure contact
@@ -197,7 +222,7 @@ app.get('/humans.txt', (req, res) => {
     'Last update: ' + new Date().toISOString().slice(0, 10),
     'Language: English',
     'Standards: MCP 2024-11-05, x402, schema.org JSON-LD, RFC 9116',
-    'Software: Hive Civilization MCP Gateway v1.0.4',
+    'Software: Hive Civilization MCP Gateway v1.1.0',
     '',
     '/* THANKS */',
     'Hive Civilization community · hiveagentiq.com',
@@ -207,8 +232,9 @@ app.get('/humans.txt', (req, res) => {
 app.get('/health', (req, res) => res.json({
   status: 'ok',
   service: 'hive-mcp-gateway',
-  version: '1.0.4',
+  version: '1.1.0',
   servers: ['evaluator','trade','depin','compute-grid','morph'],
+  registry_size: SHIM_SLUGS.length,
   meta: {
     discovery: '/.well-known/mcp.json',
     sitemap:   '/sitemap.xml',
@@ -228,7 +254,7 @@ const aggregateCard = () => {
     for (const t of m.TOOLS) tools.push({ ...t, name: `${prefix}__${t.name}` });
   }
   return {
-    serverInfo: { name: 'hive-mcp-gateway', version: '1.0.4' },
+    serverInfo: { name: 'hive-mcp-gateway', version: '1.1.0' },
     authentication: { required: false, schemes: [] },
     tools, resources: [], prompts: [],
   };
@@ -237,8 +263,10 @@ app.get('/.well-known/mcp/server-card.json', (req, res) => res.json(aggregateCar
 app.get('/server-card.json', (req, res) => res.json(aggregateCard()));
 app.get('/.well-known/mcp.json', (req, res) => res.json({
   name: 'hive-mcp-gateway',
-  version: '1.0.4',
-  servers: {
+  version: '1.1.0',
+  description: 'Hive Civilization MCP registry — discovery surface for the 22 hive-mcp-* servers.',
+  servers: SHIM_REGISTRY,
+  legacyMounts: {
     evaluator: '/evaluator/mcp',
     trade: '/trade/mcp',
     depin: '/depin/mcp',
@@ -267,16 +295,28 @@ const AGENT_NETWORK = {
   agent_onboarding: 'Send X-Agent-DID header for 100 free reads/day per DID',
   surfaces: [
     { name: 'HiveCompute', category: 'inference', url: 'https://hivecompute-g2g7.onrender.com', mcp: 'https://hivecompute-g2g7.onrender.com/mcp', agent_card: 'https://hivecompute-g2g7.onrender.com/.well-known/agent-card.json', repo: 'https://github.com/srotzin/hivecompute' },
-    { name: 'HiveEvaluator', category: 'evaluation', url: 'https://hive-mcp-gateway.onrender.com/evaluator', agent_card: 'https://hive-mcp-gateway.onrender.com/evaluator/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-evaluator' },
-    { name: 'HiveTrade', category: 'settlement', url: 'https://hive-mcp-gateway.onrender.com/trade', agent_card: 'https://hive-mcp-gateway.onrender.com/trade/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-trade' },
-    { name: 'HiveDePIN', category: 'depin', url: 'https://hive-mcp-gateway.onrender.com/depin', agent_card: 'https://hive-mcp-gateway.onrender.com/depin/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-depin' },
-    { name: 'HiveComputeGrid', category: 'compute_auction', url: 'https://hive-mcp-gateway.onrender.com/compute-grid', agent_card: 'https://hive-mcp-gateway.onrender.com/compute-grid/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-compute-grid' },
-    { name: 'HiveMining', category: 'btc_hashrate', url: 'https://hive-mcp-gateway.onrender.com/mining', agent_card: 'https://hive-mcp-gateway.onrender.com/mining/.well-known/agent.json', repo: 'https://github.com/srotzin/hive-mcp-mining' },
-    { name: 'HiveSwap', category: 'dex', url: 'https://hive-mcp-gateway.onrender.com/swap', repo: 'https://github.com/srotzin/hive-mcp-swap' },
-    { name: 'HiveVault', category: 'vault', url: 'https://hive-mcp-gateway.onrender.com/vault', repo: 'https://github.com/srotzin/hive-mcp-vault' },
-    { name: 'HiveExchange', category: 'perps', url: 'https://hive-mcp-gateway.onrender.com/exchange', repo: 'https://github.com/srotzin/hive-mcp-exchange' },
-    { name: 'HiveMOS', category: 'mining_orchestration', url: 'https://hivemorph.onrender.com/v1/mining/orchestrate', repo: 'https://github.com/srotzin/hive-mos-plugin' },
-    { name: 'HiveMorph', category: 'polymorphic_identity', url: 'https://hive-mcp-gateway.onrender.com/morph', repo: 'https://github.com/srotzin/hive-mcp-morph' },
+    { name: 'HiveAgentKYC', category: 'identity_kyc', url: shimHost('agent-kyc'), mcp: `${shimHost('agent-kyc')}/mcp`, agent_card: `${shimHost('agent-kyc')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-agent-kyc' },
+    { name: 'HiveAgentStorage', category: 'storage', url: shimHost('agent-storage'), mcp: `${shimHost('agent-storage')}/mcp`, agent_card: `${shimHost('agent-storage')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-agent-storage' },
+    { name: 'HiveCapital', category: 'capital', url: shimHost('capital'), mcp: `${shimHost('capital')}/mcp`, agent_card: `${shimHost('capital')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-capital' },
+    { name: 'HiveComputeShim', category: 'inference', url: shimHost('compute'), mcp: `${shimHost('compute')}/mcp`, agent_card: `${shimHost('compute')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-compute' },
+    { name: 'HiveComputeGrid', category: 'compute_auction', url: shimHost('compute-grid'), mcp: `${shimHost('compute-grid')}/mcp`, agent_card: `${shimHost('compute-grid')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-compute-grid' },
+    { name: 'HiveConnector', category: 'connector', url: shimHost('connector'), mcp: `${shimHost('connector')}/mcp`, agent_card: `${shimHost('connector')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-connector' },
+    { name: 'HiveCredit', category: 'credit', url: shimHost('credit'), mcp: `${shimHost('credit')}/mcp`, agent_card: `${shimHost('credit')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-credit' },
+    { name: 'HiveDePIN', category: 'depin', url: shimHost('depin'), mcp: `${shimHost('depin')}/mcp`, agent_card: `${shimHost('depin')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-depin' },
+    { name: 'HiveEscrow', category: 'escrow', url: shimHost('escrow'), mcp: `${shimHost('escrow')}/mcp`, agent_card: `${shimHost('escrow')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-escrow' },
+    { name: 'HiveEvaluator', category: 'evaluation', url: shimHost('evaluator'), mcp: `${shimHost('evaluator')}/mcp`, agent_card: `${shimHost('evaluator')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-evaluator' },
+    { name: 'HiveExchange', category: 'perps', url: shimHost('exchange'), mcp: `${shimHost('exchange')}/mcp`, agent_card: `${shimHost('exchange')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-exchange' },
+    { name: 'HiveGateway', category: 'registry', url: shimHost('gateway'), mcp: `${shimHost('gateway')}/.well-known/mcp.json`, repo: 'https://github.com/srotzin/hive-mcp-gateway' },
+    { name: 'HiveIdentity', category: 'identity', url: shimHost('identity'), mcp: `${shimHost('identity')}/mcp`, agent_card: `${shimHost('identity')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-identity' },
+    { name: 'HiveInsurance', category: 'insurance', url: shimHost('insurance'), mcp: `${shimHost('insurance')}/mcp`, agent_card: `${shimHost('insurance')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-insurance' },
+    { name: 'HiveMining', category: 'btc_hashrate', url: shimHost('mining'), mcp: `${shimHost('mining')}/mcp`, agent_card: `${shimHost('mining')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-mining' },
+    { name: 'HiveMorph', category: 'polymorphic_identity', url: shimHost('morph'), mcp: `${shimHost('morph')}/mcp`, agent_card: `${shimHost('morph')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-morph' },
+    { name: 'HiveMOS', category: 'mining_orchestration', url: shimHost('mos'), mcp: `${shimHost('mos')}/mcp`, agent_card: `${shimHost('mos')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-mos' },
+    { name: 'HiveOracle', category: 'oracle', url: shimHost('oracle'), mcp: `${shimHost('oracle')}/mcp`, agent_card: `${shimHost('oracle')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-oracle' },
+    { name: 'HiveSwap', category: 'dex', url: shimHost('swap'), mcp: `${shimHost('swap')}/mcp`, agent_card: `${shimHost('swap')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-swap' },
+    { name: 'HiveTrade', category: 'settlement', url: shimHost('trade'), mcp: `${shimHost('trade')}/mcp`, agent_card: `${shimHost('trade')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-trade' },
+    { name: 'HiveVault', category: 'vault', url: shimHost('vault'), mcp: `${shimHost('vault')}/mcp`, agent_card: `${shimHost('vault')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-vault' },
+    { name: 'HiveZKAttestation', category: 'zk_attestation', url: shimHost('zk-attestation'), mcp: `${shimHost('zk-attestation')}/mcp`, agent_card: `${shimHost('zk-attestation')}/.well-known/agent.json`, repo: 'https://github.com/srotzin/hive-mcp-zk-attestation' },
   ],
   discovery: {
     featured: 'https://hivemorph.onrender.com/v1/discovery/featured',

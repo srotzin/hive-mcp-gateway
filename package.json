@@ -1,8 +1,8 @@
 {
   "name": "hive-mcp-gateway",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "type": "module",
-  "description": "Unified gateway hosting 5 Hive Civilization MCP servers (evaluator, trade, depin, compute-grid, morph)",
+  "description": "Hive Civilization MCP registry — discovery surface for the 22 hive-mcp-* servers.",
   "main": "gateway.js",
   "scripts": {
     "start": "node gateway.js"

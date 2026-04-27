@@ -30,7 +30,18 @@ import * as M_compute_grid from './servers/hive-mcp-compute-grid.mjs';
 import * as M_morph from './servers/hive-mcp-morph.mjs';
 
 const app = express();
+import { renderLanding, renderOgImage } from './landing.js';
+
 app.use(express.json({ limit: '4mb' }));
+
+// Always advertise gateway in headers (visible to crawlers + curl)
+app.use((req, res, next) => {
+  res.setHeader('X-Hive-Gateway', 'hive-mcp-gateway/1.0.3');
+  res.setHeader('X-Hive-Brand', 'Hive Civilization');
+  res.setHeader('X-Hive-Brand-Gold', '#C08D23');
+  res.setHeader('Link', '</.well-known/mcp.json>; rel="alternate"; type="application/json", </.well-known/mcp/server-card.json>; rel="alternate"; type="application/json"');
+  next();
+});
 
 const PORT = process.env.PORT || 3000;
 
@@ -101,11 +112,14 @@ function mountFeature(app, basePath, mod) {
   mountFeature(app, '/compute-grid', M_compute_grid);
   mountFeature(app, '/morph', M_morph);
 
-// Top-level index + aggregate health
-app.get('/', (req, res) => res.json({
+// Top-level index + aggregate health — content-negotiated.
+// Browsers (Accept: text/html) get the branded HTML landing page with full meta.
+// MCP scanners / curl / JSON consumers get the JSON manifest.
+const rootJson = {
   service: 'hive-mcp-gateway',
   brand: 'Hive Civilization',
   brandGold: '#C08D23',
+  version: '1.0.3',
   servers: {
     evaluator:    { mcp: '/evaluator/mcp',    health: '/evaluator/health',    discovery: '/evaluator/.well-known/mcp.json' },
     trade:        { mcp: '/trade/mcp',        health: '/trade/health',        discovery: '/trade/.well-known/mcp.json' },
@@ -113,12 +127,44 @@ app.get('/', (req, res) => res.json({
     'compute-grid': { mcp: '/compute-grid/mcp', health: '/compute-grid/health', discovery: '/compute-grid/.well-known/mcp.json' },
     morph:        { mcp: '/morph/mcp',        health: '/morph/health',        discovery: '/morph/.well-known/mcp.json' },
   },
-}));
+};
+app.get('/', (req, res) => {
+  const accept = String(req.headers.accept || '');
+  if (accept.includes('text/html')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(renderLanding());
+  }
+  return res.json(rootJson);
+});
+
+// OG image (referenced by meta tags)
+app.get('/og.svg', (req, res) => {
+  res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(renderOgImage());
+});
+
+// SEO basics
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send([
+    'User-agent: *',
+    'Allow: /',
+    'Sitemap: https://hive-mcp-gateway.onrender.com/sitemap.xml',
+  ].join('\n'));
+});
+app.get('/sitemap.xml', (req, res) => {
+  const base = 'https://hive-mcp-gateway.onrender.com';
+  const urls = ['/', '/evaluator/health', '/trade/health', '/depin/health', '/compute-grid/health', '/morph/health',
+                '/.well-known/mcp.json', '/.well-known/mcp/server-card.json'];
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    urls.map(u => `  <url><loc>${base}${u}</loc></url>`).join('\n') + `\n</urlset>`;
+  res.type('application/xml').send(body);
+});
 
 app.get('/health', (req, res) => res.json({
   status: 'ok',
   service: 'hive-mcp-gateway',
-  version: '1.0.2',
+  version: '1.0.3',
   servers: ['evaluator','trade','depin','compute-grid','morph'],
 }));
 
@@ -131,7 +177,7 @@ const aggregateCard = () => {
     for (const t of m.TOOLS) tools.push({ ...t, name: `${prefix}__${t.name}` });
   }
   return {
-    serverInfo: { name: 'hive-mcp-gateway', version: '1.0.2' },
+    serverInfo: { name: 'hive-mcp-gateway', version: '1.0.3' },
     authentication: { required: false, schemes: [] },
     tools, resources: [], prompts: [],
   };
@@ -140,7 +186,7 @@ app.get('/.well-known/mcp/server-card.json', (req, res) => res.json(aggregateCar
 app.get('/server-card.json', (req, res) => res.json(aggregateCard()));
 app.get('/.well-known/mcp.json', (req, res) => res.json({
   name: 'hive-mcp-gateway',
-  version: '1.0.2',
+  version: '1.0.3',
   servers: {
     evaluator: '/evaluator/mcp',
     trade: '/trade/mcp',

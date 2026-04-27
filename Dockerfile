@@ -8,6 +8,7 @@ RUN npm install --omit=dev --no-audit --no-fund
 
 # Copy app source
 COPY gateway.js ./
+COPY landing.js ./
 COPY servers ./servers
 
 EXPOSE 3000

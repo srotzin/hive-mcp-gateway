@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: hive-mcp-gateway
+    runtime: docker
+    region: oregon
+    plan: starter
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: HIVE_BASE
+        value: https://hivemorph.onrender.com

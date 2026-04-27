@@ -1,0 +1,18 @@
+{
+  "name": "hive-mcp-gateway",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Unified gateway hosting 5 Hive Civilization MCP servers (evaluator, trade, depin, compute-grid, morph)",
+  "main": "gateway.js",
+  "scripts": {
+    "start": "node gateway.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "license": "MIT",
+  "author": "Steve Rotzin <steve@thehiveryiq.com> (https://www.thehiveryiq.com)"
+}

@@ -118,8 +118,36 @@ app.get('/', (req, res) => res.json({
 app.get('/health', (req, res) => res.json({
   status: 'ok',
   service: 'hive-mcp-gateway',
-  version: '1.0.1',
+  version: '1.0.2',
   servers: ['evaluator','trade','depin','compute-grid','morph'],
+}));
+
+// Smithery scanner walks the HOST root, not the mount path. Aggregate card
+// returns all tools across all 5 mounts so any root-level scan succeeds.
+const aggregateCard = () => {
+  const tools = [];
+  for (const m of [M_evaluator, M_trade, M_depin, M_compute_grid, M_morph]) {
+    const prefix = m.serverInfo.name.replace('hive-mcp-','');
+    for (const t of m.TOOLS) tools.push({ ...t, name: `${prefix}__${t.name}` });
+  }
+  return {
+    serverInfo: { name: 'hive-mcp-gateway', version: '1.0.2' },
+    authentication: { required: false, schemes: [] },
+    tools, resources: [], prompts: [],
+  };
+};
+app.get('/.well-known/mcp/server-card.json', (req, res) => res.json(aggregateCard()));
+app.get('/server-card.json', (req, res) => res.json(aggregateCard()));
+app.get('/.well-known/mcp.json', (req, res) => res.json({
+  name: 'hive-mcp-gateway',
+  version: '1.0.2',
+  servers: {
+    evaluator: '/evaluator/mcp',
+    trade: '/trade/mcp',
+    depin: '/depin/mcp',
+    'compute-grid': '/compute-grid/mcp',
+    morph: '/morph/mcp',
+  },
 }));
 
 app.listen(PORT, () => {

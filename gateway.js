@@ -28,6 +28,7 @@ import * as M_trade from './servers/hive-mcp-trade.mjs';
 import * as M_depin from './servers/hive-mcp-depin.mjs';
 import * as M_compute_grid from './servers/hive-mcp-compute-grid.mjs';
 import * as M_morph from './servers/hive-mcp-morph.mjs';
+import * as M_insurance_broker from './servers/hive-mcp-insurance-broker.mjs';
 
 const app = express();
 import { renderLanding, renderOgImage } from './landing.js';
@@ -40,8 +41,8 @@ app.use(express.json({ limit: '4mb' }));
 const SHIM_SLUGS = [
   'agent-kyc', 'agent-storage', 'capital', 'compute', 'compute-grid',
   'connector', 'credit', 'depin', 'escrow', 'evaluator', 'exchange',
-  'gateway', 'identity', 'insurance', 'mining', 'morph', 'mos',
-  'oracle', 'swap', 'trade', 'vault', 'zk-attestation',
+  'gateway', 'identity', 'insurance', 'insurance-broker', 'mining',
+  'morph', 'mos', 'oracle', 'swap', 'trade', 'vault', 'zk-attestation',
 ];
 const shimHost = (slug) => `https://hive-mcp-${slug}.onrender.com`;
 const SHIM_REGISTRY = Object.fromEntries(SHIM_SLUGS.map((slug) => [slug, {
@@ -128,6 +129,7 @@ function mountFeature(app, basePath, mod) {
   mountFeature(app, '/depin', M_depin);
   mountFeature(app, '/compute-grid', M_compute_grid);
   mountFeature(app, '/morph', M_morph);
+  mountFeature(app, '/insurance-broker', M_insurance_broker);
 
 // Top-level index + aggregate health — content-negotiated.
 // Browsers (Accept: text/html) get the branded HTML landing page with full meta.
@@ -144,6 +146,7 @@ const rootJson = {
     depin:          { mcp: '/depin/mcp',          health: '/depin/health',          discovery: '/depin/.well-known/mcp.json',          direct: shimHost('depin') },
     'compute-grid': { mcp: '/compute-grid/mcp',   health: '/compute-grid/health',   discovery: '/compute-grid/.well-known/mcp.json',   direct: shimHost('compute-grid') },
     morph:          { mcp: '/morph/mcp',          health: '/morph/health',          discovery: '/morph/.well-known/mcp.json',          direct: shimHost('morph') },
+    'insurance-broker': { mcp: '/insurance-broker/mcp', health: '/insurance-broker/health', discovery: '/insurance-broker/.well-known/mcp.json', direct: shimHost('insurance-broker') },
   },
   registry: SHIM_REGISTRY,
 };

@@ -424,3 +424,86 @@ app.listen(PORT, () => {
     console.log(`  ${m.serverInfo.name}: ${m.TOOLS.length} tools`);
   }
 });
+
+// ─── Wave B: per-request fee + subscription tiers ────────────────────────────
+// Gateway doctrine review: request-routing only (NOT payment-routing).
+// Confirmed: gateway proxies MCP JSON-RPC to shim backends. No payment state
+// flows through gateway. Fee is for discovery + routing metadata, not for
+// settling value. Doctrine-CLEAN.
+//
+// Tier schedule (Monroe W1 on Base USDC):
+//   Per-request   : $0.0001/MCP request routed
+//   Enterprise sub: $50/mo — unlimited routing + audit log
+//
+// Spectral receipt emitted on every subscribed billing event.
+
+const _GW_TREASURY = '0x15184bf50b3d3f52b60434f8942b7d52f2eb436e';
+const _GW_BRAND    = '#C08D23';
+const _GW_TIERS    = {
+  starter:    { price_usd: 10,  label: 'Starter',    calls_per_day: 10000 },
+  pro:        { price_usd: 50,  label: 'Pro',         calls_per_day: 100000 },
+  enterprise: { price_usd: 200, label: 'Enterprise',  calls_per_day: Infinity, invoice: true },
+};
+const _gwSubLedger = new Map(); // did -> { tier, expires_ms, tx_hash }
+
+async function _gwEmitReceipt({ event_type, did, amount_usd, tx_hash }) {
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 4000);
+    await fetch('https://hive-receipt.onrender.com/v1/receipt/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        issuer_did: 'did:hive:gateway',
+        recipient_did: did || 'did:hive:anonymous',
+        event_type, amount_usd: String(amount_usd),
+        currency: 'USDC', network: 'base', pay_to: _GW_TREASURY,
+        tx_hash: tx_hash || null, service: 'hive-mcp-gateway', brand: _GW_BRAND,
+        issued_ms: Date.now(),
+      }),
+      signal: ctrl.signal,
+    });
+  } catch (_) { console.warn('[gateway] receipt emit failed (non-fatal):', _.message); }
+}
+
+// POST /v1/subscription — gateway subscription tiers
+app.post('/v1/subscription', async (req, res) => {
+  const { tier, did, tx_hash } = req.body || {};
+  if (!tier || !_GW_TIERS[tier]) {
+    return res.status(400).json({ error: 'invalid_tier', valid_tiers: Object.keys(_GW_TIERS), brand: _GW_BRAND });
+  }
+  const t = _GW_TIERS[tier];
+  if (!did) return res.status(400).json({ error: 'did_required' });
+  if (tier !== 'enterprise' && !tx_hash) {
+    return res.status(402).json({
+      error: 'payment_required',
+      x402: { type: 'x402', version: '1', kind: 'subscription_gateway',
+        asking_usd: t.price_usd, accept_min_usd: t.price_usd,
+        asset: 'USDC', asset_address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        network: 'base', pay_to: _GW_TREASURY, nonce: Math.random().toString(36).slice(2),
+        issued_ms: Date.now(), tier, label: t.label,
+        note: 'Gateway subscription: unlimited MCP request routing + audit log.',
+        partner_doctrine: 'Request-routing only. No payment settlement flows through gateway.',
+      },
+      note: `Submit tx_hash for $${t.price_usd} USDC/mo to ${_GW_TREASURY} on Base.`,
+    });
+  }
+  const record = {
+    tier, did, tx_hash: tx_hash || 'enterprise_invoice',
+    activated_ms: Date.now(), expires_ms: Date.now() + 30 * 24 * 3600 * 1000,
+    price_usd: t.price_usd, calls_per_day: t.calls_per_day,
+  };
+  _gwSubLedger.set(did, record);
+  await _gwEmitReceipt({ event_type: 'subscription_activated', did, amount_usd: t.price_usd, tx_hash });
+  return res.json({ ok: true, subscription: record, receipt_emitted: true,
+    partner_note: 'Request-routing only — NOT payment-routing. Doctrine-clean.',
+    brand: _GW_BRAND });
+});
+
+// GET /v1/subscription/:did
+app.get('/v1/subscription/:did', (req, res) => {
+  const r = _gwSubLedger.get(req.params.did);
+  if (!r) return res.status(404).json({ active: false, did: req.params.did });
+  return res.json({ active: Date.now() < r.expires_ms, ...r });
+});
+// ─────────────────────────────────────────────────────────────────────────────

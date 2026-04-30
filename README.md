@@ -1,5 +1,7 @@
 # hive-mcp-gateway
 
+[![srotzin/hive-mcp-gateway MCP server](https://glama.ai/mcp/servers/srotzin/hive-mcp-gateway/badges/score.svg)](https://glama.ai/mcp/servers/srotzin/hive-mcp-gateway)
+
 Hive Civilization MCP registry — discovery surface for the 22 hive-mcp-* servers.
 
 The gateway hosts a registry at `/.well-known/mcp.json` and continues to mount 5 MCP servers in-process for legacy compatibility. Direct shim URLs are recommended for Glama / Smithery probes; the gateway is for discovery, not as a hot-path proxy.

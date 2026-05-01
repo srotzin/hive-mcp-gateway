@@ -1,8 +1,8 @@
 {
   "name": "hive-mcp-gateway",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
-  "description": "Hive Civilization MCP registry — discovery surface for the 22 hive-mcp-* servers.",
+  "description": "Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers.",
   "main": "gateway.js",
   "scripts": {
     "start": "node gateway.js"

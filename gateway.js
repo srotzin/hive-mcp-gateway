@@ -36,15 +36,18 @@ import { renderLanding, renderOgImage } from './landing.js';
 
 app.use(express.json({ limit: '4mb' }));
 
-// ─── 22-shim registry ────────────────────────────────────────────────────────
+// ─── 37-shim registry ────────────────────────────────────────────────────────
 // Canonical Render hosts for every hive-mcp-* shim. The gateway is a discovery
 // surface — direct URLs are recommended for Glama/Smithery probes.
+// audit-readiness is proxied directly through this gateway (/audit-readiness/mcp)
+// until the standalone Render service is provisioned.
 const SHIM_SLUGS = [
-  'agent-kyc', 'agent-storage', 'capital', 'compute', 'compute-grid',
+  'abtest', 'agent-kyc', 'agent-quota', 'agent-storage', 'aml-screen',
+  'auction', 'backup', 'barter', 'capital', 'cdn', 'compute', 'compute-grid',
   'connector', 'credit', 'depin', 'dispute', 'escrow', 'evaluator',
-  'exchange', 'gateway', 'identity', 'insurance', 'insurance-broker',
-  'mining', 'morph', 'mos', 'oracle', 'swap', 'trade', 'vault',
-  'zk-attestation',
+  'exchange', 'flag', 'gateway', 'identity', 'insurance', 'insurance-broker',
+  'log', 'mining', 'morph', 'mos', 'oracle', 'secrets', 'sla-monitor',
+  'swap', 'tax-observer', 'trade', 'vault', 'zk-attestation',
 ];
 const shimHost = (slug) => `https://hive-mcp-${slug}.onrender.com`;
 const SHIM_REGISTRY = Object.fromEntries(SHIM_SLUGS.map((slug) => [slug, {
@@ -56,7 +59,7 @@ const SHIM_REGISTRY = Object.fromEntries(SHIM_SLUGS.map((slug) => [slug, {
 
 // Always advertise gateway in headers (visible to crawlers + curl)
 app.use((req, res, next) => {
-  res.setHeader('X-Hive-Gateway', 'hive-mcp-gateway/1.1.0');
+  res.setHeader('X-Hive-Gateway', 'hive-mcp-gateway/1.2.0');
   res.setHeader('X-Hive-Brand', 'Hive Civilization');
   res.setHeader('X-Hive-Brand-Gold', '#C08D23');
   res.setHeader('Link', '</.well-known/mcp.json>; rel="alternate"; type="application/json", </.well-known/mcp/server-card.json>; rel="alternate"; type="application/json"');
@@ -125,7 +128,116 @@ function mountFeature(app, basePath, mod) {
   app.get(`${basePath}/server-card.json`, (req, res) => res.json(serverCard));
 }
 
-// Mount all 5 features
+// ─── audit-readiness: gateway-proxied until standalone Render service provisions ─
+// Option A: gateway IS the live MCP host for audit-readiness.
+// Forwards tools/call → POST https://hivemorph.onrender.com/v1/audit/readiness
+const HIVE_MORPH_BASE = 'https://hivemorph.onrender.com';
+const AUDIT_TOOLS = [
+  {
+    name: 'audit_readiness_score',
+    description: 'Compute a multi-jurisdictional AI compliance readiness score for an organization. Returns penalty exposure (EUR + USD), specific compliance gaps citing the regulation article, recommended audit tier (STARTER/STANDARD/ENTERPRISE/FEDERAL), and the nearest enforcement deadline. Penalty math sources EU AI Act Art 99, Colorado AI Act SB 24-205, CCPA, Cal SB 942, NYC LL 144, HIPAA. Free, no auth, rate-limited 10/IP/hr.',
+    inputSchema: {
+      type: 'object',
+      required: ['organization_country', 'jurisdictions', 'data_volume_records', 'agent_count', 'monthly_inference_calls', 'frameworks'],
+      properties: {
+        organization_country: { type: 'string', description: 'ISO 3166-1 alpha-2 country code (e.g. "US", "DE", "FR", "GB").' },
+        jurisdictions: { type: 'array', items: { type: 'string' }, description: 'Where the system operates: ["EU", "US-CO", "US-CA", "US-NY", ...]. Drives which regulations apply.' },
+        data_volume_records: { type: 'integer', description: 'Total records processed (drives CCPA / GDPR scoping).' },
+        agent_count: { type: 'integer', description: 'Number of distinct AI agents in production.' },
+        monthly_inference_calls: { type: 'integer', description: 'Inference call volume per month (drives tier selection).' },
+        sectors: { type: 'array', items: { type: 'string' }, description: 'Industries: ["finance", "healthcare", "employment", "education", "lending", "insurance", "criminal_justice", "biometric", "critical_infrastructure"].' },
+        frameworks: { type: 'array', items: { type: 'string' }, description: 'Regulations to score: ["eu_ai_act", "co_ai_act", "ccpa", "ca_sb942", "nyc_ll144", "hipaa", "gdpr", "nist_ai_rmf"].' },
+        company: { type: 'string', description: 'Organization name (optional; populates the assessment record).' },
+      },
+    },
+  },
+  {
+    name: 'audit_get_tier_pricing',
+    description: 'Returns the four published HiveAudit tier prices and bracket thresholds: STARTER ($500, <$500K exposure), STANDARD ($1,500, <$5M), ENTERPRISE ($2,500, <$50M), FEDERAL ($7,500/yr, ≥$50M or federal agency). Inlined — no backend call.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+];
+const AUDIT_TIER_CARD = {
+  tiers: [
+    { id: 'STARTER',    label: 'Audit Starter',    price_usd: 500,   billing: 'one_time_bundle',     exposure_ceiling_usd: 500000,    window_days: 30,  calls_max: 10000,  description: 'Single audit bundle, 30-day window, up to 10K calls, PDF + JSON export.' },
+    { id: 'STANDARD',   label: 'Audit Standard',   price_usd: 1500,  billing: 'one_time_bundle',     exposure_ceiling_usd: 5000000,   window_days: 90,  calls_max: 100000, description: 'Single audit bundle, 90-day window, up to 100K calls, PDF + JSON export, multi-jurisdiction.' },
+    { id: 'ENTERPRISE', label: 'Audit Enterprise', price_usd: 2500,  billing: 'one_time_bundle',     exposure_ceiling_usd: 50000000,  window_days: 180, calls_max: 500000, description: 'Single audit bundle, 180-day window, up to 500K calls, EU AI Act + NIST AI RMF + ISO 42001 mapping, white-glove delivery.' },
+    { id: 'FEDERAL',    label: 'Audit Federal',    price_usd: 7500,  billing: 'annual_subscription', exposure_ceiling_usd: null,       window_days: 365, calls_max: null,   description: 'Annual subscription. Federal-agency contracts or >$50M penalty exposure. Continuous monitoring, quarterly attestation, FedRAMP-aligned controls.' },
+  ],
+  primary_cta: { label: 'Start 30-day HiveAudit Professional trial', url: 'https://thehiveryiq.com/audit/trial', subtext: 'No credit card. ZK audit trail activates immediately.' },
+  secondary_cta: { label: 'Or buy a one-time audit bundle', url: 'https://thehiveryiq.com/pricing', subtext: null },
+  endpoint: `${HIVE_MORPH_BASE}/v1/audit/readiness`,
+  rate_limit: '10 requests / IP / hour',
+  auth_required: false,
+  brand_gold: '#C08D23',
+};
+async function executeAuditTool(name, args) {
+  if (name === 'audit_readiness_score') {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 15000);
+    const r = await fetch(`${HIVE_MORPH_BASE}/v1/audit/readiness`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+      signal: ctrl.signal,
+    });
+    let data; try { data = await r.json(); } catch { data = { raw: await r.text() }; }
+    return { type: 'text', text: JSON.stringify({ status: r.status, ...data }, null, 2) };
+  }
+  if (name === 'audit_get_tier_pricing') {
+    return { type: 'text', text: JSON.stringify(AUDIT_TIER_CARD, null, 2) };
+  }
+  throw new Error(`Unknown audit tool: ${name}`);
+}
+app.post('/audit-readiness/mcp', async (req, res) => {
+  const { jsonrpc, id, method, params } = req.body || {};
+  if (jsonrpc !== '2.0') return res.json({ jsonrpc: '2.0', id, error: { code: -32600, message: 'Invalid JSON-RPC' } });
+  try {
+    switch (method) {
+      case 'initialize':
+        return res.json({ jsonrpc: '2.0', id, result: {
+          protocolVersion: '2024-11-05',
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'hive-mcp-audit-readiness', version: '1.0.0',
+            description: 'EU AI Act / Colorado AI Act / CCPA / SB942 / LL144 / HIPAA readiness scoring with sourced penalty math.' },
+        } });
+      case 'tools/list':
+        return res.json({ jsonrpc: '2.0', id, result: { tools: AUDIT_TOOLS } });
+      case 'tools/call': {
+        const { name, arguments: args } = params || {};
+        const out = await executeAuditTool(name, args || {});
+        return res.json({ jsonrpc: '2.0', id, result: { content: [out] } });
+      }
+      case 'ping':
+        return res.json({ jsonrpc: '2.0', id, result: {} });
+      default:
+        return res.json({ jsonrpc: '2.0', id, error: { code: -32601, message: `Method not found: ${method}` } });
+    }
+  } catch (err) {
+    return res.json({ jsonrpc: '2.0', id, error: { code: -32000, message: err.message } });
+  }
+});
+app.get('/audit-readiness/health', (req, res) => res.json({
+  status: 'ok',
+  service: 'hive-mcp-audit-readiness',
+  version: '1.0.0',
+  backend: `${HIVE_MORPH_BASE}/v1/audit/readiness`,
+  note: 'Proxied through gateway until standalone Render service is provisioned.',
+}));
+app.get('/audit-readiness/.well-known/mcp.json', (req, res) => res.json({
+  name: 'hive-mcp-audit-readiness',
+  version: '1.0.0',
+  description: 'MCP server for HiveAudit Readiness — multi-jurisdictional AI compliance scoring with sourced penalty math.',
+  protocolVersion: '2024-11-05',
+  transport: 'streamable-http',
+  endpoint: 'https://hive-mcp-gateway.onrender.com/audit-readiness/mcp',
+  tools: AUDIT_TOOLS.map(t => ({ name: t.name, description: t.description })),
+  backend: `${HIVE_MORPH_BASE}/v1/audit/readiness`,
+  repository: 'https://github.com/srotzin/hive-mcp-audit-readiness',
+  brand: '#C08D23',
+}));
+
+// Mount all features
   mountFeature(app, '/evaluator', M_evaluator);
   mountFeature(app, '/trade', M_trade);
   mountFeature(app, '/depin', M_depin);
@@ -141,8 +253,8 @@ const rootJson = {
   service: 'hive-mcp-gateway',
   brand: 'Hive Civilization',
   brandGold: '#C08D23',
-  version: '1.1.0',
-  description: 'Hive Civilization MCP registry — discovery surface for the 22 hive-mcp-* servers.',
+  version: '1.2.0',
+  description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers.',
   servers: {
     evaluator:      { mcp: '/evaluator/mcp',      health: '/evaluator/health',      discovery: '/evaluator/.well-known/mcp.json',      direct: shimHost('evaluator') },
     trade:          { mcp: '/trade/mcp',          health: '/trade/health',          discovery: '/trade/.well-known/mcp.json',          direct: shimHost('trade') },
@@ -229,7 +341,7 @@ app.get('/humans.txt', (req, res) => {
     'Last update: ' + new Date().toISOString().slice(0, 10),
     'Language: English',
     'Standards: MCP 2024-11-05, x402, schema.org JSON-LD, RFC 9116',
-    'Software: Hive Civilization MCP Gateway v1.1.0',
+    'Software: Hive Civilization MCP Gateway v1.2.0',
     '',
     '/* THANKS */',
     'Hive Civilization community · hiveagentiq.com',
@@ -239,9 +351,9 @@ app.get('/humans.txt', (req, res) => {
 app.get('/health', (req, res) => res.json({
   status: 'ok',
   service: 'hive-mcp-gateway',
-  version: '1.1.0',
-  servers: ['evaluator','trade','depin','compute-grid','morph'],
-  registry_size: SHIM_SLUGS.length,
+  version: '1.2.0',
+  servers: ['evaluator','trade','depin','compute-grid','morph','insurance-broker','dispute','audit-readiness'],
+  registry_size: SHIM_SLUGS.length + 1, // +1 for gateway-proxied audit-readiness
   meta: {
     discovery: '/.well-known/mcp.json',
     sitemap:   '/sitemap.xml',
@@ -261,7 +373,7 @@ const aggregateCard = () => {
     for (const t of m.TOOLS) tools.push({ ...t, name: `${prefix}__${t.name}` });
   }
   return {
-    serverInfo: { name: 'hive-mcp-gateway', version: '1.1.0' },
+    serverInfo: { name: 'hive-mcp-gateway', version: '1.2.0' },
     authentication: { required: false, schemes: [] },
     tools, resources: [], prompts: [],
   };
@@ -270,9 +382,9 @@ app.get('/.well-known/mcp/server-card.json', (req, res) => res.json(aggregateCar
 app.get('/server-card.json', (req, res) => res.json(aggregateCard()));
 app.get('/.well-known/mcp.json', (req, res) => res.json({
   name: 'hive-mcp-gateway',
-  version: '1.1.0',
-  description: 'Hive Civilization MCP registry — discovery surface for the 22 hive-mcp-* servers.',
-  servers: SHIM_REGISTRY,
+  version: '1.2.0',
+  description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers.',
+  servers: { ...SHIM_REGISTRY, 'audit-readiness': { url: 'https://hive-mcp-gateway.onrender.com/audit-readiness', mcp: 'https://hive-mcp-gateway.onrender.com/audit-readiness/mcp', discovery: 'https://hive-mcp-gateway.onrender.com/audit-readiness/.well-known/mcp.json', repo: 'https://github.com/srotzin/hive-mcp-audit-readiness', note: 'gateway-proxied until standalone Render service is provisioned' } },
   legacyMounts: {
     evaluator: '/evaluator/mcp',
     trade: '/trade/mcp',
@@ -345,14 +457,14 @@ app.get('/.well-known/agent-network.json', (req, res) => {
 
 // ─── Schema constants (auto-injected to fix deploy) ─────
 const SERVICE = 'hive-mcp-gateway';
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 const TOOLS = (typeof globalThis.__HIVE_TOOLS__ !== 'undefined') ? globalThis.__HIVE_TOOLS__ : [];
 
 
 // ─── Schema discoverability ────────────────────────────────────────────────
 const AGENT_CARD = {
   name: SERVICE,
-  description: 'Hive Civilization MCP registry — discovery surface for the 22 hive-mcp-* servers. New agents: first call free. Loyalty: every 6th paid call is free. Pay in USDC on Base L2.',
+  description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers. New agents: first call free. Loyalty: every 6th paid call is free. Pay in USDC on Base L2.',
   url: `https://${SERVICE}.onrender.com`,
   provider: {
     organization: 'Hive Civilization',
@@ -395,7 +507,7 @@ const AP2 = {
   agent: {
     name: SERVICE,
     did: `did:web:${SERVICE}.onrender.com`,
-    description: 'Hive Civilization MCP registry — discovery surface for the 22 hive-mcp-* servers. New agents: first call free. Loyalty: every 6th paid call is free. Pay in USDC on Base L2.',
+    description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers. New agents: first call free. Loyalty: every 6th paid call is free. Pay in USDC on Base L2.',
   },
   endpoints: {
     mcp: `https://${SERVICE}.onrender.com/mcp`,
@@ -417,6 +529,39 @@ const AP2 = {
 app.get('/.well-known/agent-card.json', (req, res) => res.json(AGENT_CARD));
 app.get('/.well-known/ap2.json',         (req, res) => res.json(AP2));
 
+
+// ─── POST /mcp — aggregate root endpoint (fixes "Cannot POST /mcp") ──────────
+// Returns a JSON-RPC tools/list aggregating all locally-mounted feature modules.
+// tools/call is not supported at the root — callers should use sub-paths.
+app.post('/mcp', async (req, res) => {
+  const { jsonrpc, id, method } = req.body || {};
+  if (jsonrpc !== '2.0') {
+    return res.json({ jsonrpc: '2.0', id, error: { code: -32600, message: 'Invalid JSON-RPC' } });
+  }
+  switch (method) {
+    case 'initialize':
+      return res.json({ jsonrpc: '2.0', id, result: {
+        protocolVersion: '2024-11-05',
+        capabilities: { tools: { listChanged: false } },
+        serverInfo: { name: 'hive-mcp-gateway', version: '1.2.0',
+          description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers.' },
+      } });
+    case 'tools/list': {
+      const allTools = [];
+      for (const m of [M_evaluator, M_trade, M_depin, M_compute_grid, M_morph, M_insurance_broker, M_dispute]) {
+        const prefix = m.serverInfo.name.replace('hive-mcp-', '');
+        for (const t of m.TOOLS) allTools.push({ ...t, name: `${prefix}__${t.name}` });
+      }
+      for (const t of AUDIT_TOOLS) allTools.push({ ...t, name: `audit-readiness__${t.name}` });
+      return res.json({ jsonrpc: '2.0', id, result: { tools: allTools } });
+    }
+    case 'ping':
+      return res.json({ jsonrpc: '2.0', id, result: {} });
+    default:
+      return res.json({ jsonrpc: '2.0', id, error: { code: -32601,
+        message: `Root /mcp supports initialize/tools/list/ping only. Use /<service>/mcp for tools/call (e.g. /evaluator/mcp, /audit-readiness/mcp).` } });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`hive-mcp-gateway running on :${PORT}`);

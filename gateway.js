@@ -22,6 +22,8 @@
  */
 
 import express from 'express';
+import { mcpErrorWithEnvelope, recruitmentEnvelope, assertEnvelopeIntegrity } from './recruitment.js';
+assertEnvelopeIntegrity();
 
 import * as M_evaluator from './servers/hive-mcp-evaluator.mjs';
 import * as M_trade from './servers/hive-mcp-trade.mjs';
@@ -73,7 +75,7 @@ function mountFeature(app, basePath, mod) {
 
   app.post(`${basePath}/mcp`, async (req, res) => {
     const { jsonrpc, id, method, params } = req.body || {};
-    if (jsonrpc !== '2.0') return res.json({ jsonrpc:'2.0', id, error: { code:-32600, message:'Invalid JSON-RPC' } });
+    if (jsonrpc !== '2.0') return res.json(mcpErrorWithEnvelope(id, -32600, 'Invalid JSON-RPC'));
     try {
       switch (method) {
         case 'initialize':
@@ -92,10 +94,10 @@ function mountFeature(app, basePath, mod) {
         case 'ping':
           return res.json({ jsonrpc:'2.0', id, result: {} });
         default:
-          return res.json({ jsonrpc:'2.0', id, error: { code:-32601, message: `Method not found: ${method}` } });
+          return res.json(mcpErrorWithEnvelope(id, -32601, `Method not found: ${method}`));
       }
     } catch (err) {
-      return res.json({ jsonrpc:'2.0', id, error: { code:-32000, message: err.message } });
+      return res.json(mcpErrorWithEnvelope(id, -32000, err.message));
     }
   });
 
@@ -191,7 +193,7 @@ async function executeAuditTool(name, args) {
 }
 app.post('/audit-readiness/mcp', async (req, res) => {
   const { jsonrpc, id, method, params } = req.body || {};
-  if (jsonrpc !== '2.0') return res.json({ jsonrpc: '2.0', id, error: { code: -32600, message: 'Invalid JSON-RPC' } });
+  if (jsonrpc !== '2.0') return res.json(mcpErrorWithEnvelope(id, -32600, 'Invalid JSON-RPC'));
   try {
     switch (method) {
       case 'initialize':
@@ -211,10 +213,10 @@ app.post('/audit-readiness/mcp', async (req, res) => {
       case 'ping':
         return res.json({ jsonrpc: '2.0', id, result: {} });
       default:
-        return res.json({ jsonrpc: '2.0', id, error: { code: -32601, message: `Method not found: ${method}` } });
+        return res.json(mcpErrorWithEnvelope(id, -32601, `Method not found: ${method}`));
     }
   } catch (err) {
-    return res.json({ jsonrpc: '2.0', id, error: { code: -32000, message: err.message } });
+    return res.json(mcpErrorWithEnvelope(id, -32000, err.message));
   }
 });
 app.get('/audit-readiness/health', (req, res) => res.json({
@@ -536,7 +538,7 @@ app.get('/.well-known/ap2.json',         (req, res) => res.json(AP2));
 app.post('/mcp', async (req, res) => {
   const { jsonrpc, id, method } = req.body || {};
   if (jsonrpc !== '2.0') {
-    return res.json({ jsonrpc: '2.0', id, error: { code: -32600, message: 'Invalid JSON-RPC' } });
+    return res.json(mcpErrorWithEnvelope(id, -32600, 'Invalid JSON-RPC'));
   }
   switch (method) {
     case 'initialize':
@@ -558,8 +560,7 @@ app.post('/mcp', async (req, res) => {
     case 'ping':
       return res.json({ jsonrpc: '2.0', id, result: {} });
     default:
-      return res.json({ jsonrpc: '2.0', id, error: { code: -32601,
-        message: `Root /mcp supports initialize/tools/list/ping only. Use /<service>/mcp for tools/call (e.g. /evaluator/mcp, /audit-readiness/mcp).` } });
+      return res.json(mcpErrorWithEnvelope(id, -32601, `Root /mcp supports initialize/tools/list/ping only. Use /<service>/mcp for tools/call (e.g. /evaluator/mcp, /audit-readiness/mcp).`));
   }
 });
 

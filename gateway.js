@@ -38,9 +38,39 @@ import { renderLanding, renderOgImage } from './landing.js';
 
 app.use(express.json({ limit: '4mb' }));
 
+// ─── Environment validation (fail closed) ──────────────────────────────────
+// Every mounted feature module and the audit-readiness proxy read HIVE_BASE
+// (or hardcode the same default). Validate it once, eagerly, before mounting
+// anything, and refuse to boot on a malformed value instead of failing
+// confusingly on the first proxied call.
+function validateGatewayEnv() {
+  const errors = [];
+  const base = process.env.HIVE_BASE || 'https://hivemorph.onrender.com';
+  try {
+    const u = new URL(base);
+    if (!/^https?:$/.test(u.protocol)) errors.push(`HIVE_BASE must be http(s): got "${base}"`);
+  } catch {
+    errors.push(`HIVE_BASE is not a valid URL: "${base}"`);
+  }
+  const portEnv = process.env.PORT;
+  if (portEnv != null) {
+    const portNum = Number(portEnv);
+    if (!Number.isInteger(portNum) || portNum <= 0 || portNum > 65535) {
+      errors.push(`PORT must be a valid TCP port: got "${portEnv}"`);
+    }
+  }
+  return errors;
+}
+const GATEWAY_ENV_ERRORS = validateGatewayEnv();
+if (GATEWAY_ENV_ERRORS.length > 0) {
+  console.error('[hive-mcp-gateway] FATAL: invalid environment, refusing to start:');
+  for (const e of GATEWAY_ENV_ERRORS) console.error(`  - ${e}`);
+  process.exit(1);
+}
+
 // ─── 37-shim registry ────────────────────────────────────────────────────────
 // Canonical Render hosts for every hive-mcp-* shim. The gateway is a discovery
-// surface — direct URLs are recommended for Glama/Smithery probes.
+// surface; direct URLs are recommended for Glama/Smithery probes.
 // audit-readiness is proxied directly through this gateway (/audit-readiness/mcp)
 // until the standalone Render service is provisioned.
 const SHIM_SLUGS = [
@@ -155,7 +185,7 @@ const AUDIT_TOOLS = [
   },
   {
     name: 'audit_get_tier_pricing',
-    description: 'Returns the four published HiveAudit tier prices and bracket thresholds: STARTER ($500, <$500K exposure), STANDARD ($1,500, <$5M), ENTERPRISE ($2,500, <$50M), FEDERAL ($7,500/yr, ≥$50M or federal agency). Inlined — no backend call.',
+    description: 'Returns the four published HiveAudit tier prices and bracket thresholds: STARTER ($500, <$500K exposure), STANDARD ($1,500, <$5M), ENTERPRISE ($2,500, <$50M), FEDERAL ($7,500/yr, ≥$50M or federal agency). Inlined, no backend call.',
     inputSchema: { type: 'object', properties: {} },
   },
 ];
@@ -229,7 +259,7 @@ app.get('/audit-readiness/health', (req, res) => res.json({
 app.get('/audit-readiness/.well-known/mcp.json', (req, res) => res.json({
   name: 'hive-mcp-audit-readiness',
   version: '1.0.0',
-  description: 'MCP server for HiveAudit Readiness — multi-jurisdictional AI compliance scoring with sourced penalty math.',
+  description: 'MCP server for HiveAudit Readiness: multi-jurisdictional AI compliance scoring with sourced penalty math.',
   protocolVersion: '2024-11-05',
   transport: 'streamable-http',
   endpoint: 'https://hive-mcp-gateway.onrender.com/audit-readiness/mcp',
@@ -248,7 +278,7 @@ app.get('/audit-readiness/.well-known/mcp.json', (req, res) => res.json({
   mountFeature(app, '/insurance-broker', M_insurance_broker);
   mountFeature(app, '/dispute', M_dispute);
 
-// Top-level index + aggregate health — content-negotiated.
+// Top-level index + aggregate health, content-negotiated.
 // Browsers (Accept: text/html) get the branded HTML landing page with full meta.
 // MCP scanners / curl / JSON consumers get the JSON manifest.
 const rootJson = {
@@ -256,7 +286,7 @@ const rootJson = {
   brand: 'Hive Civilization',
   brandGold: '#C08D23',
   version: '1.2.0',
-  description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers.',
+  description: 'Hive Civilization MCP registry: discovery surface for the 37 hive-mcp-* servers.',
   servers: {
     evaluator:      { mcp: '/evaluator/mcp',      health: '/evaluator/health',      discovery: '/evaluator/.well-known/mcp.json',      direct: shimHost('evaluator') },
     trade:          { mcp: '/trade/mcp',          health: '/trade/health',          discovery: '/trade/.well-known/mcp.json',          direct: shimHost('trade') },
@@ -284,7 +314,7 @@ app.get('/og.svg', (req, res) => {
   res.send(renderOgImage());
 });
 
-// SEO basics — comprehensive crawler-discovery surface
+// SEO basics: comprehensive crawler-discovery surface
 app.get('/robots.txt', (req, res) => {
   res.type('text/plain').send([
     'User-agent: *',
@@ -317,7 +347,7 @@ app.get('/sitemap.xml', (req, res) => {
     directUrls.map(u => `  <url><loc>${u}</loc></url>`).join('\n') + `\n</urlset>`;
   res.type('application/xml').send(body);
 });
-// RFC 9116 security.txt — published security disclosure contact
+// RFC 9116 security.txt: published security disclosure contact
 app.get('/.well-known/security.txt', (req, res) => {
   const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
   res.type('text/plain').send([
@@ -331,7 +361,7 @@ app.get('/.well-known/security.txt', (req, res) => {
   ].join('\n'));
 });
 
-// humans.txt — quality signal for crawlers
+// humans.txt: quality signal for crawlers
 app.get('/humans.txt', (req, res) => {
   res.type('text/plain').send([
     '/* TEAM */',
@@ -385,7 +415,7 @@ app.get('/server-card.json', (req, res) => res.json(aggregateCard()));
 app.get('/.well-known/mcp.json', (req, res) => res.json({
   name: 'hive-mcp-gateway',
   version: '1.2.0',
-  description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers.',
+  description: 'Hive Civilization MCP registry: discovery surface for the 37 hive-mcp-* servers.',
   servers: { ...SHIM_REGISTRY, 'audit-readiness': { url: 'https://hive-mcp-gateway.onrender.com/audit-readiness', mcp: 'https://hive-mcp-gateway.onrender.com/audit-readiness/mcp', discovery: 'https://hive-mcp-gateway.onrender.com/audit-readiness/.well-known/mcp.json', repo: 'https://github.com/srotzin/hive-mcp-audit-readiness', note: 'gateway-proxied until standalone Render service is provisioned' } },
   legacyMounts: {
     evaluator: '/evaluator/mcp',
@@ -466,7 +496,7 @@ const TOOLS = (typeof globalThis.__HIVE_TOOLS__ !== 'undefined') ? globalThis.__
 // ─── Schema discoverability ────────────────────────────────────────────────
 const AGENT_CARD = {
   name: SERVICE,
-  description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers. New agents: first call free. Loyalty: every 6th paid call is free. Pay in USDC on Base L2.',
+  description: 'Hive Civilization MCP registry: discovery surface for the 37 hive-mcp-* servers. New agents: first call free. Loyalty: every 6th paid call is free. Pay in USDC on Base L2.',
   url: `https://${SERVICE}.onrender.com`,
   provider: {
     organization: 'Hive Civilization',
@@ -509,7 +539,7 @@ const AP2 = {
   agent: {
     name: SERVICE,
     did: `did:web:${SERVICE}.onrender.com`,
-    description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers. New agents: first call free. Loyalty: every 6th paid call is free. Pay in USDC on Base L2.',
+    description: 'Hive Civilization MCP registry: discovery surface for the 37 hive-mcp-* servers. New agents: first call free. Loyalty: every 6th paid call is free. Pay in USDC on Base L2.',
   },
   endpoints: {
     mcp: `https://${SERVICE}.onrender.com/mcp`,
@@ -532,9 +562,9 @@ app.get('/.well-known/agent-card.json', (req, res) => res.json(AGENT_CARD));
 app.get('/.well-known/ap2.json',         (req, res) => res.json(AP2));
 
 
-// ─── POST /mcp — aggregate root endpoint (fixes "Cannot POST /mcp") ──────────
+// ─── POST /mcp: aggregate root endpoint (fixes "Cannot POST /mcp") ──────────
 // Returns a JSON-RPC tools/list aggregating all locally-mounted feature modules.
-// tools/call is not supported at the root — callers should use sub-paths.
+// tools/call is not supported at the root; callers should use sub-paths.
 app.post('/mcp', async (req, res) => {
   const { jsonrpc, id, method } = req.body || {};
   if (jsonrpc !== '2.0') {
@@ -546,7 +576,7 @@ app.post('/mcp', async (req, res) => {
         protocolVersion: '2024-11-05',
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'hive-mcp-gateway', version: '1.2.0',
-          description: 'Hive Civilization MCP registry — discovery surface for the 37 hive-mcp-* servers.' },
+          description: 'Hive Civilization MCP registry: discovery surface for the 37 hive-mcp-* servers.' },
       } });
     case 'tools/list': {
       const allTools = [];
@@ -579,7 +609,7 @@ app.listen(PORT, () => {
 //
 // Tier schedule (Monroe W1 on Base USDC):
 //   Per-request   : $0.0001/MCP request routed
-//   Enterprise sub: $50/mo — unlimited routing + audit log
+//   Enterprise sub: $50/mo, unlimited routing + audit log
 //
 // Spectral receipt emitted on every subscribed billing event.
 
@@ -612,7 +642,7 @@ async function _gwEmitReceipt({ event_type, did, amount_usd, tx_hash }) {
   } catch (_) { console.warn('[gateway] receipt emit failed (non-fatal):', _.message); }
 }
 
-// POST /v1/subscription — gateway subscription tiers
+// POST /v1/subscription: gateway subscription tiers
 app.post('/v1/subscription', async (req, res) => {
   const { tier, did, tx_hash } = req.body || {};
   if (!tier || !_GW_TIERS[tier]) {
@@ -642,7 +672,7 @@ app.post('/v1/subscription', async (req, res) => {
   _gwSubLedger.set(did, record);
   await _gwEmitReceipt({ event_type: 'subscription_activated', did, amount_usd: t.price_usd, tx_hash });
   return res.json({ ok: true, subscription: record, receipt_emitted: true,
-    partner_note: 'Request-routing only — NOT payment-routing. Doctrine-clean.',
+    partner_note: 'Request-routing only, NOT payment-routing. Doctrine-clean.',
     brand: _GW_BRAND });
 });
 
@@ -652,4 +682,16 @@ app.get('/v1/subscription/:did', (req, res) => {
   if (!r) return res.status(404).json({ active: false, did: req.params.did });
   return res.json({ active: Date.now() < r.expires_ms, ...r });
 });
-// ─────────────────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+
+// Honest 404: must be the LAST route registered. Any path that doesn't
+// match one of the mounts above (feature mcp/health/well-known routes, the
+// discovery endpoints, or the subscription routes) gets an explicit JSON
+// 404, not Express's default HTML 404 page and not a fabricated 200.
+app.use((req, res) => {
+  res.status(404).json(recruitmentEnvelope(404, {
+    error: 'not_found',
+    path: req.path,
+    service: 'hive-mcp-gateway',
+  }));
+});

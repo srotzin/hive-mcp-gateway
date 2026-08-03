@@ -11,7 +11,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.22.2"
   },
   "license": "MIT",
   "author": "Steve Rotzin <steve@thehiveryiq.com> (https://www.thehiveryiq.com)"

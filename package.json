@@ -14,5 +14,8 @@
     "express": "^4.22.2"
   },
   "license": "MIT",
-  "author": "Steve Rotzin <steve@thehiveryiq.com> (https://www.thehiveryiq.com)"
+  "author": "Steve Rotzin <steve@thehiveryiq.com> (https://www.thehiveryiq.com)",
+  "overrides": {
+    "qs": "6.16.2"
+  }
 }
